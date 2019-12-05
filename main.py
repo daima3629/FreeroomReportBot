@@ -37,97 +37,57 @@ Prefix : `fr//`
 async def check(message):
     sliced = message.content.split()
     if len(sliced) == 2:
-        category = client.get_channel(sliced[1])
+        category = client.get_channel(int(sliced[1]))
         if not category:
             await message.channel.send("> Error:そのIDのカテゴリーは存在しません。")
             return
         await message.channel.send("> 指定カテゴリー内の全チャンネルの期限を確認します。")
         count = 0
-        print("check for {}".format(str(category.id)))
+        print("-----check <{}> -----".format(str(category.id)))
         for chan in category.channels:
             last = await chan.history(limit=1).flatten()
+            if not last:
+                print("Continue <{}>".format(str(chan.id)))
+                continue
             last_time = last[0].created_at
             now = datetime.datetime.now()
-            last_time_year = last_time.date().year
-            now_year = last_time.date().year
-            last_time_month = last_time.date().month
-            now_month = now.date().month
-            last_time_day = last_time.date().day
-            now_day = now.date().day
-            if last_time_year == now_year:
-                if last_time_month == 12:
-                    if last_time_day == 30 or last_time_day == 31:
-                        if now_day == 30 or last_time_day == 31:
-                            await message.channel.send("> {} の有効期限が切れています。削除してください。".format(chan.mention))
-                            print("Found : {}".format(str(chan.id)))
-                            count += 1
-                            continue
-                    elif last_time_day < now_day:
-                        await message.channel.send("> {} の有効期限が切れています。削除してください。".format(chan.mention))
-                        print("Found : {}".format(str(chan.id)))
-                        count += 1
-                        continue
-                elif last_time_month < now_month:
-                    if last_time_day == 30 or last_time_day == 31:
-                        if now_day == 30 or last_time_day ==31:
-                            await message.channel.send("> {} の有効期限が切れています。削除してください。".format(chan.mention))
-                            print("Found : {}".format(str(chan.id)))
-                            count += 1
-                            continue
-                    if last_time_day < now_day:
-                        await message.channel.send("> {} の有効期限が切れています。削除してください。".format(chan.mention))
-                        print("Found : {}".format(str(chan.id)))
-                        count += 1
-                        continue
-            print("continue...")
+            s = now - last_time
+            day = s.days
+            if day > 30:
+                await message.channel.send("> {}の有効期限が切れています。削除してください。".format(chan.mention))
+                count += 1
+                print("Found <{}>".format(chan.id))
+            else:
+                print("Continue <{}>".format(str(chan.id)))
+
         await message.channel.send("> 期限切れチャンネルが {} 個見つかりました".format(str(count)))
-        print("end check for {}".format(str(category.id)))
+        print("-----end check <{}> -----".format(str(category.id)))
     elif len(sliced) == 1:
         category = message.channel.category
         if not category:
             await message.channel.send("> Error:発言チャンネルはカテゴリーの中に入っていません。")
             return
-        await message.channel.send("> 発言カテゴリー内の全チャンネルの期限を確認します。")
+        await message.channel.send("> 指定カテゴリー内の全チャンネルの期限を確認します。")
         count = 0
-        print("check for {}".format(str(category.id)))
+        print("-----check <{}> -----".format(str(category.id)))
         for chan in category.channels:
             last = await chan.history(limit=1).flatten()
+            if not last:
+                print("Continue <{}>".format(str(chan.id)))
+                continue
             last_time = last[0].created_at
             now = datetime.datetime.now()
-            last_time_year = last_time.date().year
-            now_year = last_time.date().year
-            last_time_month = last_time.date().month
-            now_month = now.date().month
-            last_time_day = last_time.date().day
-            now_day = now.date().day
-            if last_time_year == now_year:
-                if last_time_month == 12:
-                    if last_time_day == 30 or last_time_day == 31:
-                        if now_day == 30 or last_time_day == 31:
-                            await message.channel.send("> {} の有効期限が切れています。削除してください。".format(chan.mention))
-                            print("Found : {}".format(str(chan.id)))
-                            count += 1
-                            continue
-                    elif last_time_day < now_day:
-                        await message.channel.send("> {} の有効期限が切れています。削除してください。".format(chan.mention))
-                        print("Found : {}".format(str(chan.id)))
-                        count += 1
-                        continue
-                elif last_time_month < now_month:
-                    if last_time_day == 30 or last_time_day == 31:
-                        if now_day == 30 or last_time_day ==31:
-                            await message.channel.send("> {} の有効期限が切れています。削除してください。".format(chan.mention))
-                            print("Found : {}".format(str(chan.id)))
-                            count += 1
-                            continue
-                    if last_time_day < now_day:
-                        await message.channel.send("> {} の有効期限が切れています。削除してください。".format(chan.mention))
-                        print("Found : {}".format(str(chan.id)))
-                        count += 1
-                        continue
-            print("Not {}".format(str(chan.id)))
+            s = now - last_time
+            day = s.days
+            if day > 30:
+                await message.channel.send("> {}の有効期限が切れています。削除してください。".format(chan.mention))
+                count += 1
+                print("Found <{}>".format(chan.id))
+            else:
+                print("Continue <{}>".format(str(chan.id)))
+
         await message.channel.send("> 期限切れチャンネルが {} 個見つかりました".format(str(count)))
-        print("end check for {}".format(str(category.id)))
+        print("-----end check <{}> -----".format(str(category.id)))
     else:
         message.channel.send("Error:引数が多すぎます。")
         return
