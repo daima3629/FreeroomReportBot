@@ -1,4 +1,6 @@
-import discord, datetime, json
+import discord, datetime, json, sys, math
+from discord.ext import tasks
+import traceback
 client = discord.Client()
 
 with open("config.json", "r") as f:
@@ -6,9 +8,36 @@ with open("config.json", "r") as f:
 
 @client.event
 async def on_ready():
-    game = discord.Game("type fr//help")
+    pinchan = client.get_channel(652773329777721345)
+    logchan = client.get_channel(652754897204412424)
+    now = datetime.datetime.now()
+    msg = await pinchan.send("> ping check")
+    msg_time = msg.created_at
+    ping = msg_time - now
+    milisec = math.floor(ping.microseconds/1000)
+    game = discord.Game("fr//help | Ping:{}ms".format(str(milisec)))
     await client.change_presence(activity=game)
     print("Ready.")
+    embed = discord.Embed(
+        title = "Boot",
+        description = "Boot Succesful",
+        timestamp = datetime.datetime.now()
+    )
+    await logchan.send(embed=embed)
+
+@tasks.loop(seconds=10)
+async def ping():
+    if not client.is_ready():
+        return
+    pinchan = client.get_channel(652773329777721345)
+    now = datetime.datetime.now()
+    msg = await pinchan.send("> ping check")
+    msg_time = msg.created_at
+    ping = msg_time - now
+    milisec = math.floor(ping.microseconds/1000)
+    game = discord.Game("fr//help | Ping:{}ms".format(str(milisec)))
+    await client.change_presence(activity=game)
+ping.start()
 
 async def help(message):
     msg = """>>> **FreeroomReportBot v1.0**
@@ -102,5 +131,11 @@ async def on_message(message):
             await help(message)
         elif message.content.startswith("fr//check"):
             await check(message)
+        elif message.content == "fr//stop":
+            if message.author.id == 570243143958528010:
+                await message.channel.send("> BOTを終了しています...")
+                sys.exit()
+            else:
+                await message.channel.send("> このコマンドは開発者しか使用できません。")
 
 client.run(config["TOKEN"])
