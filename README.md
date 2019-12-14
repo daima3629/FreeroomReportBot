@@ -1,5 +1,6 @@
 # FreeroomReportBot v1.5
 [![GitHub license](https://img.shields.io/badge/license-UIUC/NCSA-blue.svg)](https://github.com/daima3629/FreeroomReportBot/blob/master/LICENSE)
+
 discordサーバーのフリールームの期限切れを確認するBOTです。
 ## Usage
 writing...
