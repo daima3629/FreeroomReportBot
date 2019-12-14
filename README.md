@@ -8,5 +8,5 @@ writing...
 [BOTの招待リンク](https://discordapp.com/api/oauth2/authorize?client_id=650989851818328074&permissions=76816&scope=bot)
 
 ## Contributor
-######daima3629
+###### daima3629
 Discord ID : `daima3629#1235`
