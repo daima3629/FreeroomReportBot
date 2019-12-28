@@ -1,6 +1,7 @@
 import discord, datetime, json, math
 from discord.ext import tasks
 import traceback
+from aioconsole import ainput
 client = discord.Client()
 
 with open("config.json", "r") as f:
@@ -11,8 +12,41 @@ with open("data.json", "r") as f:
 def jsonsave():
     with open("data.json", "w") as f:
         json.dump(data, f, indent=4)
+    with open("config.json", "w") as f:
+        json.dump(config, f, indent=4)
 
-presence = "fr//help"
+async def cli(command):
+    s = command.split()
+    helpmsg = """<
+---help---
+send [channel_id:int] [Message:str]
+    [channel_id]のIDのチャンネルにメッセージを送ります
+"""
+    if s[0] == "help":
+        return helpmsg
+    elif s[0] == "send":
+        if len(s) < 2:
+            return "Usage: send [channel_id:int] [Message:str]"
+        chan = client.get_channel(int(s[1]))
+        if not chan:
+            result = "< E: そのチャンネルは存在しません。"
+            return result
+        msg = ""
+        for i,m in enumerate(s):
+            if i < 2:
+                continue
+            msg += m + " "
+        await chan.send(msg)
+        result = "< Send '{}' to {}".format(str(chan.id), msg)
+        return result
+    else:
+        return helpmsg
+
+repair = config["repair"]
+if repair == True:
+    presence = "修理中..."
+else:
+    presence = "fr//help"
 @client.event
 async def on_ready():
     global presence
@@ -24,18 +58,30 @@ async def on_ready():
     ping = msg_time - now
     milisec = math.floor(ping.microseconds/1000)
     game = discord.Game("{} | Ping:{}ms".format(presence, str(milisec)))
-    await client.change_presence(activity=game)
-    print("Ready.")
+    if repair:
+        await client.change_presence(activity=game, status=discord.Status.do_not_disturb)
+        print("Ready | Mode:Repairing")
+        mode = "Repairing"
+    else:
+        await client.change_presence(activity=game, status=discord.Status.online)
+        print("Ready | Mode:Normal")
+        mode = "Normal"
+    
     embed = discord.Embed(
-        title = "Boot",
+        title = "Boot | Mode:{}".format(mode),
         description = "Boot Succesful",
         timestamp = datetime.datetime.now()
     )
     await logchan.send(embed=embed)
+    while not client.is_closed():
+        command = await ainput()
+        result = await cli(command)
+        print(result)
+
 
 @tasks.loop(seconds=10)
 async def ping():
-    global presence
+    global presence, repair
     if not client.is_ready():
         return
     pinchan = client.get_channel(652773329777721345)
@@ -45,7 +91,10 @@ async def ping():
     ping = msg_time - now
     milisec = math.floor(ping.microseconds/1000)
     game = discord.Game("{} | Ping:{}ms".format(presence, str(milisec)))
-    await client.change_presence(activity=game)
+    if repair:
+        await client.change_presence(activity=game, status=discord.Status.do_not_disturb)
+    else:
+        await client.change_presence(activity=game, status=discord.Status.online)
 ping.start()
 
 @tasks.loop(minutes=1)
@@ -81,11 +130,18 @@ async def checktasks():
                     print("Continue <{}>".format(str(chan.id)))
                     continue
                 last_time = last[0].created_at
-                now = datetime.datetime.now()
+                tz_jst = datetime.timezone(datetime.timedelta(hours=9))
+                now = datetime.datetime.now(tz_jst)
                 s = now - last_time
                 day = s.days
                 if day > 30:
-                    embed = discord.Embed(description="{}の有効期限が切れています。削除してください。".format(chan.mention))
+                    embed = discord.Embed(
+                        title = "Found",
+                    description = """
+チャンネル名 : {}
+期限切れ日時 : {}                    
+""".format(chan.mention, last_time.strftime("%Y/%m/%D %H:%M"))
+                    )
                     await s_chan.send(embed=embed)
                     count += 1
                     print("Found <{}>".format(chan.id))
@@ -123,7 +179,7 @@ async def help(message):
         inline = False
     )
     embed.add_field(
-        name = "fr//check",
+        name = "`fr//check`",
         value = """コマンドを打ったチャンネルのカテゴリー内の全チャンネルを確認します。
     ※チャンネルで一度も発言がない場合、期限は過ぎていないものとされます。""",
         inline = False
@@ -215,12 +271,21 @@ async def check(message):
             if not last:
                 print("Continue <{}>".format(str(chan.id)))
                 continue
+            tz_jst = datetime.timezone(datetime.timedelta(hours=9))
             last_time = last[0].created_at
-            now = datetime.datetime.now()
-            s = now - last_time
+            last_time_jst = last_time.astimezone(tz_jst)
+            
+            now = datetime.datetime.now(tz_jst)
+            s = now - last_time_jst
             day = s.days
             if day > 30:
-                embed = discord.Embed(description="{}の有効期限が切れています。削除してください。".format(chan.mention))
+                embed = discord.Embed(
+                    title = "Found",
+                    description = """
+チャンネル名 : {}
+期限切れ日時 : {}                    
+""".format(chan.mention, last_time_jst.strftime("%Y/%m/%d %H:%M"))
+                )
                 await message.channel.send(embed=embed)
                 count += 1
                 print("Found <{}>".format(chan.id))
@@ -438,8 +503,8 @@ async def obey(message):
 
 #-------↓for BOT OP↓-------#
 async def botop(message):
-    global presence
-    if not message.author.id == 570243143958528010:
+    global presence, repair
+    if not message.author.id in config["botops"]:
         embed = discord.Embed(
             title = "エラー",
             description = "このコマンドはBOT開発者しか利用できません。"
@@ -449,8 +514,10 @@ async def botop(message):
     args = message.content.split()
     if len(args) == 1:
         embed = discord.Embed(title="BotOperationHelp")
-        embed.add_field(name="`presence`", value="Change Bot presence.")
-        embed.add_field(name="`stop`", value="Stop Bot.")
+        embed.add_field(name="`presence`", value="Change Bot presence.", inline=False)
+        embed.add_field(name="`stop`", value="Stop Bot.", inline=False)
+        embed.add_field(name="`repair-on`", value="Update Bot repair status to `Repairing`.", inline=False)
+        embed.add_field(name="`repair-off`", value="Update Bot repair status to `Normal`.", inline=False)
         #----------------------------------------------------#
         await message.channel.send(embed=embed)
     elif args[1] == "stop":
@@ -464,17 +531,58 @@ async def botop(message):
             description = "Presenceが`{}`に変更されました。\n次回pingチェック時に適用されます。".format(presence)
         )
         await message.channel.send(embed=embed)
+    elif args[1] == "repair-on":
+        repair = True
+        config["repair"] = True
+        jsonsave()
+        presence = "修理中..."
+        embed = discord.Embed(
+            title = "Update Repair Status",
+            description = "BOTを修理中の状態にしました。\n**修理が終わったら必ず**`fr//botop repair-off`**を実行してください。**"
+        )
+        await message.channel.send(embed=embed)
+    elif args[1] == "repair-off":
+        repair = False
+        config["repair"] = False
+        jsonsave()
+        presence = "fr//help"
+        embed = discord.Embed(
+            title = "Update Repair Status",
+            description = "BOTを通常状態に戻しました。"
+        )
+        await message.channel.send(embed=embed)
+    elif args[1] == "cli":
+        await message.channel.send("> cliで入力したいコマンドをそのまま打ってください")
+        msg = await client.wait_for("message", check=lambda m: message.channel == m.channel and m.author == message.author)
+        result = await cli(msg.content)
+        await message.channel.send("```{}```".format(result))
+
 
 
 @client.event
 async def on_message(message):
+    global repair
     if message.author == client.user:
         return
     mentions = message.mentions
     if client.user in mentions:
         await message.channel.send("> Prefix -> `fr//help`")
         return
+    if message.channel.id == config["cli-channel"]:
+        result = await cli(message.content)
+        msg = "```{}```".format(result)
+        await message.channel.send(msg)
     if message.content.startswith("fr//"):
+        if repair:
+            if not message.author.id in config["botops"]:
+                embed = discord.Embed(
+                    title = "Repairing...",
+                    description = "現在BOTのコーディング中ですのですべてのコマンドが利用できません。\n申し訳ございません。\n連絡は`daima3629#1235`まで"
+                )
+                await message.channel.send(embed=embed)
+                return
+            else:
+                await message.channel.send("> 現在修理中です。")
         if message.content == "fr//help":
             await help(message)
 
