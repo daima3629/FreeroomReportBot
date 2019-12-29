@@ -66,17 +66,18 @@ async def on_ready():
         await client.change_presence(activity=game, status=discord.Status.online)
         print("Ready | Mode:Normal")
         mode = "Normal"
-    
+    tz_jst = datetime.timezone(datetime.timedelta(hours=9))
     embed = discord.Embed(
         title = "Boot | Mode:{}".format(mode),
         description = "Boot Succesful",
-        timestamp = datetime.datetime.now()
+        timestamp = datetime.datetime.now(tz_jst)
     )
     await logchan.send(embed=embed)
     while not client.is_closed():
         command = await ainput()
-        result = await cli(command)
-        print(result)
+        if command:
+            result = await cli(command)
+            print(result)
 
 
 @tasks.loop(seconds=10)
@@ -97,65 +98,81 @@ async def ping():
         await client.change_presence(activity=game, status=discord.Status.online)
 ping.start()
 
-@tasks.loop(minutes=1)
+@tasks.loop(minutes=30)
 async def checktasks():
-    if not client.is_ready():
-        return
-    now_jst = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
-    if now_jst.hour == 0:
-        if not now_jst.minute == 0:
+    try:
+        if not client.is_ready():
             return
-    else:
-        return
-    print("<<checktasks>>")
-    for d in data["checktasks"]:
-        cat = client.get_channel(d[0])
-        s_chan = client.get_channel(d[1])
-        ignores = data["ignores"].get(str(cat.id))
-        count = 0
-        embed = discord.Embed(
-            title = "自動チェック",
-            description = "午前0:00になりましたので、自動チェックを行います。\n除外登録されているチャンネルはないものとして扱われます。"
-        )
-        await s_chan.send(embed=embed)
-        print("-----check <{}> -----".format(str(cat.id)))
-        for chan in cat.channels:
-            try:
-                if ignores:
-                    if chan.id in ignores:
-                        print("Ignore <{}>".format(str(chan.id)))
+        now_jst = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+        if now_jst.hour == 0:
+            if not now_jst.minute == 0:
+                return
+        else:
+            return
+        print("<<checktasks>>")
+        for d in data["checktasks"]:
+            cat = client.get_channel(d[0])
+            s_chan = client.get_channel(d[1])
+            ignores = data["ignores"].get(str(cat.id))
+            count = 0
+            embed = discord.Embed(
+                title = "自動チェック",
+                description = "午前0:00になりましたので、自動チェックを行います。\n除外登録されているチャンネルはないものとして扱われます。"
+            )
+            await s_chan.send(embed=embed)
+            print("-----check <{}> -----".format(str(cat.id)))
+            for chan in cat.channels:
+                try:
+                    if ignores:
+                        if chan.id in ignores:
+                            print("Ignore <{}>".format(str(chan.id)))
+                            continue
+                    last = await chan.history(limit=1).flatten()
+                    if not last:
+                        print("Continue <{}>".format(str(chan.id)))
                         continue
-                last = await chan.history(limit=1).flatten()
-                if not last:
-                    print("Continue <{}>".format(str(chan.id)))
-                    continue
-                last_time = last[0].created_at
-                tz_jst = datetime.timezone(datetime.timedelta(hours=9))
-                now = datetime.datetime.now(tz_jst)
-                s = now - last_time
-                day = s.days
-                if day > 30:
-                    embed = discord.Embed(
-                        title = "Found",
-                    description = """
+                    last_time = last[0].created_at
+                    tz_jst = datetime.timezone(datetime.timedelta(hours=9))
+                    last_time_jst = last_time.astimezone(tz_jst)
+                    now = datetime.datetime.now(tz_jst)
+                    s = now - last_time_jst
+                    day = s.days
+                    if day > 30:
+                        embed = discord.Embed(
+                            title = "Found",
+                        description = """
 チャンネル名 : {}
 期限切れ日時 : {}                    
-""".format(chan.mention, last_time.strftime("%Y/%m/%D %H:%M"))
-                    )
+""".format(chan.mention, last_time_jst.strftime("%Y/%m/%d %H:%M"))
+                        )
+                        await s_chan.send(embed=embed)
+                        count += 1
+                        print("Found <{}>".format(chan.id))
+                        continue
+                    else:
+                        print("Continue <{}>".format(str(chan.id)))
+                except discord.errors.Forbidden:
+                    print("Forbidden <{}>".format(str(chan.id)))
+                    embed = discord.Embed(description="{}のメッセージ履歴を読む権限がないため、スキップされました。".format(chan.mention))
                     await s_chan.send(embed=embed)
-                    count += 1
-                    print("Found <{}>".format(chan.id))
                     continue
-                else:
-                    print("Continue <{}>".format(str(chan.id)))
-            except discord.errors.Forbidden:
-                print("Forbidden <{}>".format(str(chan.id)))
-                embed = discord.Embed(description="{}のメッセージ履歴を読む権限がないため、スキップされました。".format(chan.mention))
-                await s_chan.send(embed=embed)
-                continue
-        await s_chan.send("> 期限切れチャンネルが {} 個見つかりました".format(str(count)))
-        print("-----end check <{}> -----".format(str(cat.id)))
-    print("<<checktasks>>")
+            await s_chan.send("> 期限切れチャンネルが {} 個見つかりました".format(str(count)))
+            print("-----end check <{}> -----".format(str(cat.id)))
+        print("<<checktasks>>")
+    except Exception as e:
+        err = ''.join(traceback.TracebackException.from_exception(e).format())
+        tz_jst = datetime.timezone(datetime.timedelta(hours=9))
+        now = datetime.datetime.now(tz_jst)
+        now_str = now.strftime("%Y/%m/%d %H:%M")
+        embed = discord.Embed(
+            title = "Error happend!",
+            description = "`checktasks()`関数内にてエラーが発生しました。"
+        )
+        embed.add_field(name="発生時刻", value=now_str, inline=False)
+        embed.add_field(name="エラー内容", value="```{}```".format(err), inline=False)
+        err_chan = client.get_channel(660855440665608212)
+        await err_chan.send(embed=embed)
+        return
 checktasks.start()
 
 async def help(message):
@@ -248,57 +265,72 @@ Prefix : `fr//`
     await message.channel.send(embed=embed)
 
 async def check(message):
-    category = message.channel.category
-    if not category:
-        embed = discord.Embed(title="エラー", description="発言チャンネルはカテゴリーの中に入っていません。")
+    try:
+        category = message.channel.category
+        if not category:
+            embed = discord.Embed(title="エラー", description="発言チャンネルはカテゴリーの中に入っていません。")
+            await message.channel.send(embed=embed)
+            return
+        ignores = data["ignores"].get(str(category.id))
+        embed = discord.Embed(
+            title = "チャンネルチェック",
+            description = "発言カテゴリー内の全チャンネルの期限を確認します。\n除外登録されているチャンネルはないものとして扱われます。"
+        )
         await message.channel.send(embed=embed)
-        return
-    ignores = data["ignores"].get(str(category.id))
-    embed = discord.Embed(
-        title = "チャンネルチェック",
-        description = "発言カテゴリー内の全チャンネルの期限を確認します。\n除外登録されているチャンネルはないものとして扱われます。"
-    )
-    await message.channel.send(embed=embed)
-    count = 0
-    print("-----check <{}> -----".format(str(category.id)))
-    for chan in category.channels:
-        try:
-            if ignores:
-                if chan.id in ignores:
-                    print("Ignore <{}>".format(str(chan.id)))
+        count = 0
+        print("-----check <{}> -----".format(str(category.id)))
+        for chan in category.channels:
+            try:
+                if ignores:
+                    if chan.id in ignores:
+                        print("Ignore <{}>".format(str(chan.id)))
+                        continue
+                last = await chan.history(limit=1).flatten()
+                if not last:
+                    print("Continue <{}>".format(str(chan.id)))
                     continue
-            last = await chan.history(limit=1).flatten()
-            if not last:
-                print("Continue <{}>".format(str(chan.id)))
-                continue
-            tz_jst = datetime.timezone(datetime.timedelta(hours=9))
-            last_time = last[0].created_at
-            last_time_jst = last_time.astimezone(tz_jst)
-            
-            now = datetime.datetime.now(tz_jst)
-            s = now - last_time_jst
-            day = s.days
-            if day > 30:
-                embed = discord.Embed(
-                    title = "Found",
-                    description = """
+                tz_jst = datetime.timezone(datetime.timedelta(hours=9))
+                last_time = last[0].created_at
+                last_time_jst = last_time.astimezone(tz_jst)
+
+                now = datetime.datetime.now(tz_jst)
+                s = now - last_time_jst
+                day = s.days
+                if day > 30:
+                    embed = discord.Embed(
+                        title = "Found",
+                        description = """
 チャンネル名 : {}
 期限切れ日時 : {}                    
 """.format(chan.mention, last_time_jst.strftime("%Y/%m/%d %H:%M"))
-                )
+                    )
+                    await message.channel.send(embed=embed)
+                    count += 1
+                    print("Found <{}>".format(chan.id))
+                else:
+                    print("Continue <{}>".format(str(chan.id)))
+            except discord.errors.Forbidden:
+                print("Forbidden <{}>".format(str(chan.id)))
+                embed = discord.Embed(description="{}のメッセージ履歴を読む権限がないため、スキップされました。".format(chan.mention))
                 await message.channel.send(embed=embed)
-                count += 1
-                print("Found <{}>".format(chan.id))
-            else:
-                print("Continue <{}>".format(str(chan.id)))
-        except discord.errors.Forbidden:
-            print("Forbidden <{}>".format(str(chan.id)))
-            embed = discord.Embed(description="{}のメッセージ履歴を読む権限がないため、スキップされました。".format(chan.mention))
-            await message.channel.send(embed=embed)
-            continue
-    embed = discord.Embed(description="期限切れチャンネルが {} 個見つかりました".format(str(count)))
-    await message.channel.send(embed=embed)
-    print("-----end check <{}> -----".format(str(category.id)))
+                continue
+        embed = discord.Embed(description="期限切れチャンネルが {} 個見つかりました".format(str(count)))
+        await message.channel.send(embed=embed)
+        print("-----end check <{}> -----".format(str(category.id)))
+    except Exception as e:
+        err = ''.join(traceback.TracebackException.from_exception(e).format())
+        tz_jst = datetime.timezone(datetime.timedelta(hours=9))
+        now = datetime.datetime.now(tz_jst)
+        now_str = now.strftime("%Y/%m/%d %H:%M")
+        embed = discord.Embed(
+            title = "Error happend!",
+            description = "`check()`関数内にてエラーが発生しました。"
+        )
+        embed.add_field(name="発生時刻", value=now_str, inline=False)
+        embed.add_field(name="エラー内容", value="```{}```".format(err))
+        err_chan = client.get_channel(660855440665608212)
+        await err_chan.send(embed=embed)
+        return
 
 async def auto_on(message):
     per = message.author.guild_permissions
