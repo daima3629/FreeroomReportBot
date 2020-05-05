@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands
 import json
-import math
 import datetime
 import traceback
 
