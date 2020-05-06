@@ -12,6 +12,8 @@ INITIAL_EXTENSIONS = [
     "cogs.maincmds"
 ]
 
+ERR_COLOR = 0xeb0000
+
 class FreeRoomReportBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="fr//", help_command=None)
@@ -21,7 +23,7 @@ class FreeRoomReportBot(commands.Bot):
                 self.load_extension(cog)
             except:
                 traceback.print_exc()
-    
+
     async def on_ready(self):
         with open("data.json", "r") as f:
             data = json.load(f)
@@ -33,6 +35,13 @@ class FreeRoomReportBot(commands.Bot):
         print("---------------------")
         print(f"FreeRoomReportBot Online\nID: {self.user.id}")
         return
+
+    async def on_command_error(self, ctx, err):
+        if isinstance(err, discord.ext.commands.MissingPermissions):
+            embed = discord.Embed(
+                title="Error",
+                description="コマンド実行に必要な権限がありません。\nhelpを確認してください。"
+            )
 
 
 if __name__ == "__main__":
