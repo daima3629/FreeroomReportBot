@@ -81,7 +81,7 @@ class MainCmds(commands.Cog):
             return await err_chan.send(embed=embed)
 
     @commands.command()
-    @commands.has_permissions(manage_channel=True)
+    @commands.has_permissions(manage_channels=True)
     async def settings(self, ctx, command, *args):
         if command == "ignore":
             if not ctx.message.category:
