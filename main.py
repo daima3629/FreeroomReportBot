@@ -49,7 +49,7 @@ class FreeRoomReportBot(commands.Bot):
             )
             return await ctx.send(embed=embed)
 
-        err_str = ''.join(traceback.TracebackException.from_exception(e).format())
+        err_str = ''.join(traceback.TracebackException.from_exception(err).format())
         tz_jst = datetime.timezone(datetime.timedelta(hours=9))
         time = datetime.datetime.now(tz_jst).strftime("%Y/%m/%d %H:%M")
         command_name = ctx.command.name
