@@ -56,11 +56,16 @@ class FreeRoomReportBot(commands.Bot):
         cog_name = ctx.command.cog.__class__.__name__
         embed = discord.Embed(
             title="Unknown Error happend",
-            description=f"{command_name}.{cog_name}\ntraceback:```py{err_str}```",
+            description="予期されないエラーが発生しました。",
             color=self.ERRCOLOR
         )
+        embed.add_field(name="発生コマンド名", value=f"`{cog_name}.{command_name}`")
+        embed.add_field(name="発生サーバー", value=f"{ctx.channel.guild.name} | `{ctx.channel.guild.id}``")
+        embed.add_field(name="発生チャンネル", value=f"{ctx.channel.name} | `{ctx.channel.id}`")
         embed.set_footer(text=time)
         await self.error_channel.send(embed=embed)
+        await self.error_channel.send(f"> Traceback\n```py\n{err_str}\n```")
+        return
 
 
 if __name__ == "__main__":
