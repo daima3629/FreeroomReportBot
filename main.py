@@ -55,7 +55,7 @@ class FreeRoomReportBot(commands.Bot):
         command_name = ctx.command.name
         cog_name = ctx.command.cog.__class__.__name__
         embed = discord.Embed(
-            title="Unknown Error happend",
+            title="Unknown Error happened",
             description="予期されないエラーが発生しました。",
             color=self.ERRCOLOR
         )
