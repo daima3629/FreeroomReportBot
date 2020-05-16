@@ -2,7 +2,11 @@ from discord.ext import commands
 
 
 class Args:
-    def __init__(self, args=[], options={}):
+    def __init__(self, args=None, options=None):
+        if args is None:
+            args = []
+        if options is None:
+            options = {}
         self.args = args
         self.options = args
 
