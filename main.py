@@ -15,8 +15,8 @@ INITIAL_EXTENSIONS = [
 
 
 class FreeRoomReportBot(commands.Bot):
-    def __init__(self):
-        super().__init__(command_prefix="fr//", help_command=None)
+    def __init__(self, command_prefix, **kwargs):
+        super().__init__(command_prefix, **kwargs)
 
         for cog in INITIAL_EXTENSIONS:
             try:
@@ -69,5 +69,7 @@ class FreeRoomReportBot(commands.Bot):
 
 
 if __name__ == "__main__":
-    bot = FreeRoomReportBot()
+    intents = discord.Intents.all()
+    intents.typing = False
+    bot = FreeRoomReportBot(command_prefix="fr//", help_command=None, intents=intents)
     bot.run(config["DISCORD_TOKEN"])
